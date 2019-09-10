@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+type Params = map[string]interface{}
+type Map = map[string]interface{}
+
 // DB contains information for current db connection
 type DB struct {
 	sync.RWMutex
@@ -228,8 +231,80 @@ func (s *DB) SubQuery() *expr {
 }
 
 // Where return a new relation, filter records with given conditions, accepts `map`, `struct` or `string` as conditions, refer http://jinzhu.github.io/gorm/crud.html#query
-func (s *DB) Where(query interface{}, args ...interface{}) *DB {
+func (s *DB) RawWhere(query interface{}, args ...interface{}) *DB {
 	return s.clone().search.Where(query, args...).db
+}
+
+
+func (s *DB) Where(query interface{}, args ...interface{}) *DB {
+	if len(args) > 0 {
+		field := query.(string)
+		if strings.Index(field, "__") != -1 {
+			items := strings.Split(field, "__")
+			if len(items) == 2 {
+				field := items[0]
+				op := items[1]
+				
+				if op == "in" {
+					field = fmt.Sprintf("%s in (?)", field)
+				} else if op == "gt" {
+					field = fmt.Sprintf("%s > ?", field)
+				} else if op == "gte" {
+					field = fmt.Sprintf("%s >= ?", field)
+				} else if op == "lt" {
+					field = fmt.Sprintf("%s < ?", field)
+				} else if op == "lte" {
+					field = fmt.Sprintf("%s <= ?", field)
+				} else if op == "contains" {
+					field = fmt.Sprintf("%s LIKE ?", field)
+					args[0] = fmt.Sprintf("%%%s%%", args[0].(string))
+				} else if op == "between" {
+					field = fmt.Sprintf("%s BETWEEN ? AND ?", field)
+				}
+				return s.RawWhere(field, args...)
+			} else {
+				return s.RawWhere(query, args...)
+			}
+		} else {
+			query = fmt.Sprintf("%s = ?", query)
+			return s.RawWhere(query, args...)
+		}
+	} else {
+		db := s
+		conditions := query.(map[string]interface{})
+		for k, v := range conditions {
+			if strings.Index(k, "__") != -1 {
+				items := strings.Split(k, "__")
+				if len(items) == 2 {
+					field := items[0]
+					op := items[1]
+					
+					if op == "in" {
+						field = fmt.Sprintf("%s in (?)", field)
+					} else if op == "gt" {
+						field = fmt.Sprintf("%s > ?", field)
+					} else if op == "gte" {
+						field = fmt.Sprintf("%s >= ?", field)
+					} else if op == "lt" {
+						field = fmt.Sprintf("%s < ?", field)
+					} else if op == "lte" {
+						field = fmt.Sprintf("%s <= ?", field)
+					} else if op == "contains" {
+						field = fmt.Sprintf("%s LIKE ?", field)
+						v = fmt.Sprintf("%%%s%%", v.(string))
+					} else if op == "between" {
+						field = fmt.Sprintf("%s BETWEEN ? AND ?", field)
+					}
+					db = db.RawWhere(field, v)
+				}
+			} else {
+				k = fmt.Sprintf("%s = ?", k)
+				db = db.RawWhere(k, v)
+			}
+		}
+		
+		return db
+	}
 }
 
 // Or filter records that match before conditions or this one, similar to `Where`
@@ -394,8 +469,26 @@ func (s *DB) Pluck(column string, value interface{}) *DB {
 }
 
 // Count get how many records for a model
-func (s *DB) Count(value interface{}) *DB {
+func (s *DB) CountWithModel(value interface{}) *DB {
 	return s.NewScope(s.Value).count(value).db
+}
+
+// robert: to Support Beego ORM's syntax
+func (s *DB) Count() (int64, error) {
+	var value int64
+	result := s.NewScope(s.Value).count(&value)
+	return value, result.db.Error
+}
+
+// robert: to Support Beego ORM's syntax
+func (s *DB) Exist() bool {
+	count, err := s.Count()
+	if err != nil {
+		fmt.Println("[gorm] Error: ", err)
+		return false
+	} else {
+		return count > 0
+	}
 }
 
 // Related get related associations
