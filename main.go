@@ -266,7 +266,11 @@ func (s *DB) Where(query interface{}, args ...interface{}) *DB {
 				return s.RawWhere(query, args...)
 			}
 		} else {
-			query = fmt.Sprintf("%s = ?", query)
+			if !strings.Contains(field, " ") {
+				query = fmt.Sprintf("%s = ?", query)
+			} else {
+				//db.Where("name = ?", ...)这种形式，不用对query做处理
+			}
 			return s.RawWhere(query, args...)
 		}
 	} else {
