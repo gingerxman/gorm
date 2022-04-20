@@ -235,7 +235,6 @@ func (s *DB) RawWhere(query interface{}, args ...interface{}) *DB {
 	return s.clone().search.Where(query, args...).db
 }
 
-
 func (s *DB) Where(query interface{}, args ...interface{}) *DB {
 	if len(args) > 0 {
 		field := query.(string)
@@ -244,9 +243,13 @@ func (s *DB) Where(query interface{}, args ...interface{}) *DB {
 			if len(items) == 2 {
 				field := items[0]
 				op := items[1]
-				
+
 				if op == "in" {
 					field = fmt.Sprintf("%s in (?)", field)
+				} else if op == "notin" {
+					field = fmt.Sprintf("%s not in (?)", field)
+				} else if op == "ne" {
+					field = fmt.Sprintf("%s != ?", field)
 				} else if op == "gt" {
 					field = fmt.Sprintf("%s > ?", field)
 				} else if op == "gte" {
@@ -282,7 +285,7 @@ func (s *DB) Where(query interface{}, args ...interface{}) *DB {
 				if len(items) == 2 {
 					field := items[0]
 					op := items[1]
-					
+
 					if op == "in" {
 						field = fmt.Sprintf("%s in (?)", field)
 					} else if op == "gt" {
@@ -306,7 +309,7 @@ func (s *DB) Where(query interface{}, args ...interface{}) *DB {
 				db = db.RawWhere(k, v)
 			}
 		}
-		
+
 		return db
 	}
 }
